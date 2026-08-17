@@ -105,7 +105,7 @@
     letter-spacing:0.06em;
     color:var(--text-dim);
   }
-  input[type=text],input[type=password],input[type=number]{
+  input[type=text],input[type=password],input[type=number],select{
     background:var(--bg);
     border:1px solid var(--line);
     border-radius:6px;
@@ -115,7 +115,28 @@
     font-size:13px;
     outline:none;
   }
-  input:focus{border-color:var(--amber-dim);}
+  select{appearance:none; cursor:pointer;}
+  input:focus,select:focus{border-color:var(--amber-dim);}
+
+  .storage-note{
+    font-size:11px;
+    color:var(--text-dim);
+    margin:-8px 0 20px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+  }
+  .storage-note button{
+    background:none;
+    border:none;
+    color:var(--amber);
+    font-size:11px;
+    text-decoration:underline;
+    cursor:pointer;
+    padding:0;
+    font-family:inherit;
+  }
 
   .config-adv{
     margin-bottom:20px;
@@ -205,6 +226,38 @@
     cursor:not-allowed;
   }
   button.action:hover:not(:disabled){filter:brightness(1.08);}
+
+  button.action.secondary{
+    background:transparent;
+    border:1px solid var(--amber-dim);
+    color:var(--amber);
+  }
+  button.action.secondary:hover:not(:disabled){
+    background:rgba(232,163,61,0.08);
+    filter:none;
+  }
+
+  input[type=file]{
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:8px 10px;
+    color:var(--text-dim);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    width:100%;
+  }
+  input[type=file]::file-selector-button{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:4px;
+    color:var(--text);
+    padding:5px 10px;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:12px;
+    cursor:pointer;
+    margin-right:8px;
+  }
 
   .status{
     font-size:12px;
@@ -413,6 +466,42 @@
   .sig-accum{background:#3a2e12; color:var(--amber);}
   .sig-none{background:var(--panel-2); color:var(--text-dim);}
 
+  .sector-compare{
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:14px 16px;
+    margin-bottom:18px;
+    background:var(--panel-2);
+  }
+  .sector-compare-title{
+    font-size:12px;
+    color:var(--text-dim);
+    margin-bottom:10px;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+  }
+  .sector-compare-grid{
+    display:flex;
+    gap:24px;
+    flex-wrap:wrap;
+    align-items:center;
+    margin-bottom:10px;
+  }
+  .sector-compare-lbl{
+    font-size:10.5px;
+    color:var(--text-dim);
+    margin-bottom:3px;
+  }
+  .sector-compare-val{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:16px;
+    font-weight:600;
+  }
+  .sector-compare-read{
+    font-size:12px;
+    color:var(--text);
+  }
+
   .footnote{
     margin-top:22px;
     font-size:11px;
@@ -458,6 +547,8 @@
     .stat-pair{gap:20px;}
 
     .legend{gap:12px;flex-wrap:wrap;font-size:10.5px;}
+    .storage-note{flex-direction:column;align-items:flex-start;gap:4px;}
+    .sector-compare-grid{gap:16px;}
   }
 </style>
 </head>
@@ -487,6 +578,10 @@
       <input type="number" id="threshold" value="30" min="1">
     </div>
   </div>
+  <div class="storage-note">
+    <span>Se guarda automáticamente en este navegador (no se envía a ningún servidor salvo Twelve Data).</span>
+    <button id="btnClearStorage" type="button">Borrar datos guardados</button>
+  </div>
 
   <details class="config-adv">
     <summary>Ajustes de clasificación (volumen / precio)</summary>
@@ -510,6 +605,7 @@
   <div class="tabs">
     <button class="tab-btn active" data-tab="single">Acción individual</button>
     <button class="tab-btn" data-tab="sector">Rotación sectorial</button>
+    <button class="tab-btn" data-tab="watch">Vigilancia (lista)</button>
   </div>
 
   <!-- TAB: ACCIÓN INDIVIDUAL -->
@@ -518,6 +614,12 @@
       <div class="field" style="max-width:220px;">
         <label>Ticker</label>
         <input type="text" id="tickerInput" placeholder="Ej: AAPL, TSLA, SAN.MC" value="">
+      </div>
+      <div class="field" style="max-width:220px;">
+        <label>Comparar con sector</label>
+        <select id="sectorRefSelect">
+          <option value="">— Ninguno —</option>
+        </select>
       </div>
       <button class="action" id="btnSingle">Analizar</button>
     </div>
@@ -530,6 +632,7 @@
   <div class="panel" id="tab-sector" style="display:none;">
     <div class="row">
       <button class="action" id="btnSector">Actualizar rotación</button>
+      <button class="action secondary" id="btnExportSector" style="display:none;">Exportar CSV</button>
       <span class="status mono" id="statusSector" style="margin:0;"></span>
     </div>
     <div id="errorSector"></div>
@@ -542,10 +645,35 @@
     <div id="resultSector"></div>
   </div>
 
+  <!-- TAB: VIGILANCIA POR LISTA -->
+  <div class="panel" id="tab-watch" style="display:none;">
+    <div class="row">
+      <div class="field" style="max-width:280px;">
+        <label>Archivo .txt con tickers (uno por línea o separados por comas)</label>
+        <input type="file" id="watchFileInput" accept=".txt,text/plain">
+      </div>
+    </div>
+    <div id="watchFileName" class="subtext" style="display:none;"></div>
+    <div class="row">
+      <button class="action" id="btnWatch">Analizar lista</button>
+      <button class="action secondary" id="btnExportWatch" style="display:none;">Exportar CSV</button>
+      <span class="status mono" id="statusWatch" style="margin:0;"></span>
+    </div>
+    <div id="errorWatch"></div>
+    <div class="legend" id="watchLegend" style="display:none;">
+      <span><i class="dot" style="background:var(--green)"></i> Impulso alcista</span>
+      <span><i class="dot" style="background:var(--amber)"></i> Posible acumulación</span>
+      <span><i class="dot" style="background:var(--red)"></i> Distribución</span>
+      <span><i class="dot" style="background:var(--text-dim)"></i> Sin señal clara</span>
+    </div>
+    <div id="resultWatch"></div>
+  </div>
+
   <div class="footnote">
     Métrica: variación % del volumen medio de los últimos 3 días hábiles <b>completos</b> (se excluye la sesión de hoy, ya que su volumen está incompleto mientras el mercado sigue abierto) frente a la media de los ~17 días hábiles previos, combinada con la variación de precio en la misma ventana para clasificar cada caso como impulso alcista, posible acumulación, distribución o sin señal clara. Es una lectura orientativa, no una recomendación de inversión.
-    Plan gratuito de Twelve Data: máx. 8 peticiones/min — la rotación sectorial se consulta con esperas automáticas para no exceder el límite.
+    Plan gratuito de Twelve Data: máx. 8 peticiones/min y 800/día — tanto la rotación sectorial como la vigilancia por lista respetan ese límite automáticamente; con listas largas puede tardar varios minutos.
     Sectores basados en los ETFs SPDR Select Sector (XLC, XLY, XLP, XLE, XLF, XLV, XLI, XLB, XLRE, XLK, XLU) como proxy de EE.UU.
+    Los resultados de rotación sectorial y de vigilancia por lista se pueden exportar a CSV con la fecha de la consulta.
   </div>
 
 </div>
@@ -564,6 +692,61 @@ const SECTORS = [
   {t:'XLU', name:'Utilities'},
   {t:'XLC', name:'Comunicación'},
 ];
+
+// Poblar el selector de sector de referencia
+const sectorRefSelect = document.getElementById('sectorRefSelect');
+SECTORS.forEach(s => {
+  const opt = document.createElement('option');
+  opt.value = s.t;
+  opt.textContent = `${s.name} (${s.t})`;
+  sectorRefSelect.appendChild(opt);
+});
+
+// ---- Persistencia local (solo en este navegador) ----
+const STORAGE_KEY = 'volumenMonitorSettings';
+const PERSISTED_FIELDS = ['apiKey', 'threshold', 'volSignalThreshold', 'priceFlatBand', 'sectorRefSelect', 'tickerInput'];
+
+function loadSettings(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return;
+    const saved = JSON.parse(raw);
+    PERSISTED_FIELDS.forEach(id => {
+      if(saved[id] !== undefined){
+        const el = document.getElementById(id);
+        if(el) el.value = saved[id];
+      }
+    });
+  }catch(e){ /* localStorage no disponible (modo privado, etc.): se ignora */ }
+}
+
+function saveSettings(){
+  try{
+    const data = {};
+    PERSISTED_FIELDS.forEach(id => {
+      const el = document.getElementById(id);
+      if(el) data[id] = el.value;
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }catch(e){ /* se ignora si no hay almacenamiento disponible */ }
+}
+
+loadSettings();
+PERSISTED_FIELDS.forEach(id => {
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('input', saveSettings);
+  if(el) el.addEventListener('change', saveSettings);
+});
+
+document.getElementById('btnClearStorage').addEventListener('click', () => {
+  try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+  document.getElementById('apiKey').value = '';
+  document.getElementById('threshold').value = '30';
+  document.getElementById('volSignalThreshold').value = '10';
+  document.getElementById('priceFlatBand').value = '1.5';
+  document.getElementById('tickerInput').value = '';
+  sectorRefSelect.value = '';
+});
 
 // ---- Rate limiter: máx 8 llamadas / 60s (plan free Twelve Data) ----
 const callTimestamps = [];
@@ -677,28 +860,13 @@ function fmtVol(n){
 function refreshClassificationUI(){
   const threshold = parseFloat(document.getElementById('threshold').value) || 0;
 
-  const sectorResultEl = document.getElementById('resultSector');
-  if(window._sectorResults){
-    window._sectorResults.forEach((r, idx) => {
-      const block = sectorResultEl.querySelector(`.sector-block[data-idx="${idx}"]`);
-      if(!block) return;
-      const chip = block.querySelector('.signal-chip');
-      if(chip){
-        const signal = classify(r.pct, r.pricePct);
-        chip.className = 'signal-chip ' + signal.cls;
-        chip.textContent = signal.label;
-      }
-      const detail = document.getElementById('sector-detail-' + idx);
-      if(detail && detail.dataset.rendered){
-        detail.innerHTML = buildDetailHtml(r.values, r.pct, r.lastAvg, r.prevAvg, r.baselineDays, threshold, r.pricePct);
-      }
-    });
-  }
+  refreshExpandableStore('_sectorResults', 'sector', document.getElementById('resultSector'));
+  refreshExpandableStore('_watchResults', 'watch', document.getElementById('resultWatch'));
 
   const singleResultEl = document.getElementById('resultSingle');
   if(window._lastSingle && singleResultEl.querySelector('.signal-badge')){
     const s = window._lastSingle;
-    singleResultEl.innerHTML = buildDetailHtml(s.values, s.pct, s.lastAvg, s.prevAvg, s.baselineDays, threshold, s.pricePct);
+    singleResultEl.innerHTML = buildDetailHtml(s.values, s.pct, s.lastAvg, s.prevAvg, s.baselineDays, threshold, s.pricePct, s.sectorInfo || null);
   }
 }
 ['volSignalThreshold','priceFlatBand','threshold'].forEach(id => {
@@ -712,8 +880,114 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('tab-single').style.display = btn.dataset.tab === 'single' ? 'block' : 'none';
     document.getElementById('tab-sector').style.display = btn.dataset.tab === 'sector' ? 'block' : 'none';
+    document.getElementById('tab-watch').style.display = btn.dataset.tab === 'watch' ? 'block' : 'none';
   });
 });
+
+// ---- Exportar a CSV ----
+function csvEscape(v){
+  return '"' + String(v).replace(/"/g, '""') + '"';
+}
+
+function exportToCsv(storeKey, filenamePrefix){
+  const results = window[storeKey];
+  if(!results || !results.length) return;
+  const todayIso = new Date().toISOString().slice(0,10);
+  const header = ['Ticker','Nombre','Variacion_volumen_%','Variacion_precio_%','Senal','Fecha_exportacion'];
+  const rows = results.map(r => {
+    const signal = classify(r.pct, r.pricePct);
+    return [r.ticker, r.name, r.pct.toFixed(2), r.pricePct.toFixed(2), signal.label, todayIso].map(csvEscape).join(',');
+  });
+  const csv = [header.map(csvEscape).join(','), ...rows].join('\r\n');
+  // BOM para que Excel abra bien los acentos
+  const blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${filenamePrefix}_${todayIso}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ---- Lista expandible reutilizable (sectores y vigilancia) ----
+// Cada item de "results" debe tener: ticker, name, title, subtitle, pct, pricePct,
+// lastAvg, prevAvg, baselineDays, values
+function renderExpandableList(containerEl, results, storeKey, detailPrefix){
+  window[storeKey] = results;
+  const maxAbs = Math.max(...results.map(r => Math.abs(r.pct)), 1);
+
+  containerEl.innerHTML = results.map((r, idx) => {
+    const isUp = r.pct >= 0;
+    const widthPct = Math.min((Math.abs(r.pct)/maxAbs)*50, 50);
+    const signal = classify(r.pct, r.pricePct);
+    return `
+      <div class="sector-block" data-idx="${idx}">
+        <div class="sector-row" role="button" tabindex="0" aria-expanded="false">
+          <div class="sector-name">
+            ${r.title}<span class="ticker">${r.subtitle || ''}</span>
+            <span class="signal-chip ${signal.cls}">${signal.label}</span>
+          </div>
+          <div class="track">
+            <div class="zero"></div>
+            <div class="fill ${isUp?'pos':'neg'}" style="width:${widthPct}%"></div>
+          </div>
+          <div class="sector-pct ${isUp?'up':'down'}">
+            ${isUp?'+':''}${r.pct.toFixed(1)}%
+            <span class="chevron">▾</span>
+          </div>
+        </div>
+        <div class="sector-detail" id="${detailPrefix}-detail-${idx}"></div>
+      </div>
+    `;
+  }).join('');
+
+  containerEl.querySelectorAll('.sector-row').forEach(row => {
+    const toggle = () => {
+      const block = row.closest('.sector-block');
+      const idx = block.dataset.idx;
+      const detail = document.getElementById(`${detailPrefix}-detail-${idx}`);
+      const isOpen = block.classList.contains('open');
+      containerEl.querySelectorAll('.sector-block.open').forEach(b => {
+        if(b !== block){
+          b.classList.remove('open');
+          b.querySelector('.sector-row').setAttribute('aria-expanded','false');
+        }
+      });
+      block.classList.toggle('open', !isOpen);
+      row.setAttribute('aria-expanded', String(!isOpen));
+      if(!isOpen && !detail.dataset.rendered){
+        const r = window[storeKey][idx];
+        const threshold = parseFloat(document.getElementById('threshold').value) || 0;
+        detail.innerHTML = buildDetailHtml(r.values, r.pct, r.lastAvg, r.prevAvg, r.baselineDays, threshold, r.pricePct);
+        detail.dataset.rendered = '1';
+      }
+    };
+    row.addEventListener('click', toggle);
+    row.addEventListener('keydown', e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggle(); }});
+  });
+}
+
+function refreshExpandableStore(storeKey, detailPrefix, containerEl){
+  const threshold = parseFloat(document.getElementById('threshold').value) || 0;
+  const results = window[storeKey];
+  if(!results) return;
+  results.forEach((r, idx) => {
+    const block = containerEl.querySelector(`.sector-block[data-idx="${idx}"]`);
+    if(!block) return;
+    const chip = block.querySelector('.signal-chip');
+    if(chip){
+      const signal = classify(r.pct, r.pricePct);
+      chip.className = 'signal-chip ' + signal.cls;
+      chip.textContent = signal.label;
+    }
+    const detail = document.getElementById(`${detailPrefix}-detail-${idx}`);
+    if(detail && detail.dataset.rendered){
+      detail.innerHTML = buildDetailHtml(r.values, r.pct, r.lastAvg, r.prevAvg, r.baselineDays, threshold, r.pricePct);
+    }
+  });
+}
 
 // ---- Acción individual ----
 document.getElementById('btnSingle').addEventListener('click', async () => {
@@ -735,10 +1009,26 @@ document.getElementById('btnSingle').addEventListener('click', async () => {
   try{
     const values = await fetchDailySeries(ticker, apiKey);
     const {pct, lastAvg, prevAvg, baselineDays, pricePct} = computeChange(values);
-    statusEl.textContent = '';
     window._lastSingle = {values, pct, lastAvg, prevAvg, baselineDays, pricePct};
+
+    let sectorInfo = null;
+    const sectorTicker = document.getElementById('sectorRefSelect').value;
+    if(sectorTicker){
+      const sectorMeta = SECTORS.find(s => s.t === sectorTicker);
+      statusEl.textContent = `Consultando ${sectorTicker} para comparar...`;
+      try{
+        const sValues = await fetchDailySeries(sectorTicker, apiKey);
+        const sChange = computeChange(sValues);
+        sectorInfo = {ticker: sectorTicker, name: sectorMeta ? sectorMeta.name : sectorTicker, ...sChange};
+        window._lastSingle.sectorInfo = sectorInfo;
+      }catch(e){
+        // si falla la comparación, se muestra igualmente el resultado de la acción
+      }
+    }
+
+    statusEl.textContent = '';
     const threshold = parseFloat(document.getElementById('threshold').value) || 0;
-    resultEl.innerHTML = buildDetailHtml(values, pct, lastAvg, prevAvg, baselineDays, threshold, pricePct);
+    resultEl.innerHTML = buildDetailHtml(values, pct, lastAvg, prevAvg, baselineDays, threshold, pricePct, sectorInfo);
   }catch(err){
     statusEl.textContent = '';
     errorEl.innerHTML = `<div class="error">${err.message}</div>`;
@@ -747,7 +1037,7 @@ document.getElementById('btnSingle').addEventListener('click', async () => {
   }
 });
 
-function buildDetailHtml(values, pct, lastAvg, prevAvg, baselineDays, threshold, pricePct){
+function buildDetailHtml(values, pct, lastAvg, prevAvg, baselineDays, threshold, pricePct, sectorInfo){
   const isUp = pct >= 0;
   const isPriceUp = pricePct >= 0;
   const signal = classify(pct, pricePct);
@@ -769,6 +1059,45 @@ function buildDetailHtml(values, pct, lastAvg, prevAvg, baselineDays, threshold,
     </div>`;
   }).join('');
 
+  let sectorHtml = '';
+  if(sectorInfo){
+    const sSignal = classify(sectorInfo.pct, sectorInfo.pricePct);
+    const sIsUp = sectorInfo.pct >= 0;
+    const sIsPriceUp = sectorInfo.pricePct >= 0;
+
+    // Lectura de si la acción va en línea, por delante o en contra de su sector (en precio)
+    const diff = pricePct - sectorInfo.pricePct;
+    let readTxt;
+    if(Math.abs(diff) <= 1){
+      readTxt = 'se mueve en línea con su sector';
+    }else if(diff > 1){
+      readTxt = `va por delante de su sector por ${diff.toFixed(1)} puntos`;
+    }else{
+      readTxt = `va por detrás de su sector por ${Math.abs(diff).toFixed(1)} puntos`;
+    }
+
+    sectorHtml = `
+      <div class="sector-compare">
+        <div class="sector-compare-title">vs. ${sectorInfo.name} (${sectorInfo.ticker})</div>
+        <div class="sector-compare-grid">
+          <div class="sector-compare-col">
+            <div class="sector-compare-lbl">Volumen sector</div>
+            <div class="sector-compare-val ${sIsUp?'up':'down'}">${sIsUp?'+':''}${sectorInfo.pct.toFixed(1)}%</div>
+          </div>
+          <div class="sector-compare-col">
+            <div class="sector-compare-lbl">Precio sector</div>
+            <div class="sector-compare-val ${sIsPriceUp?'up':'down'}">${sIsPriceUp?'+':''}${sectorInfo.pricePct.toFixed(1)}%</div>
+          </div>
+          <div class="sector-compare-col">
+            <div class="sector-compare-lbl">Señal sector</div>
+            <div class="signal-chip ${sSignal.cls}" style="margin-left:0;">${sSignal.label}</div>
+          </div>
+        </div>
+        <div class="sector-compare-read">La acción ${readTxt} en precio en la misma ventana de 3 sesiones.</div>
+      </div>
+    `;
+  }
+
   return `
     <div class="signal-badge ${signal.cls}">${signal.label}</div>
     <div class="stat-pair">
@@ -782,6 +1111,7 @@ function buildDetailHtml(values, pct, lastAvg, prevAvg, baselineDays, threshold,
       </div>
     </div>
     ${flag}
+    ${sectorHtml}
     <div class="subtext">media reciente: ${fmtVol(lastAvg)} · media base: ${fmtVol(prevAvg)}</div>
     <div class="bars-scroll"><div class="bars">${barsHtml}</div></div>
     <div class="footnote" style="margin-top:14px;">Últimas ${barCount} sesiones (desliza para ver todas) · las barras ámbar son los 3 días usados para la media reciente. Revisa si hay un día suelto con volumen muy alto: eso explicaría una caída sin que sea rotación real.</div>
@@ -800,9 +1130,11 @@ document.getElementById('btnSector').addEventListener('click', async () => {
   const statusEl = document.getElementById('statusSector');
   const resultEl = document.getElementById('resultSector');
   const legendEl = document.getElementById('sectorLegend');
+  const exportBtn = document.getElementById('btnExportSector');
   errorEl.innerHTML = '';
   resultEl.innerHTML = '';
   legendEl.style.display = 'none';
+  exportBtn.style.display = 'none';
 
   if(!apiKey){ errorEl.innerHTML = '<div class="error">Introduce tu API key de Twelve Data arriba.</div>'; return; }
 
@@ -818,7 +1150,7 @@ document.getElementById('btnSector').addEventListener('click', async () => {
     try{
       const values = await fetchDailySeries(s.t, apiKey);
       const {pct, lastAvg, prevAvg, baselineDays, pricePct} = computeChange(values);
-      results.push({...s, pct, lastAvg, prevAvg, baselineDays, pricePct, values});
+      results.push({ticker:s.t, name:s.name, title:s.name, subtitle:s.t, pct, lastAvg, prevAvg, baselineDays, pricePct, values});
     }catch(err){
       errors.push(`${s.t}: ${err.message}`);
     }
@@ -833,61 +1165,98 @@ document.getElementById('btnSector').addEventListener('click', async () => {
   if(!results.length) return;
 
   results.sort((a,b) => b.pct - a.pct);
-  const maxAbs = Math.max(...results.map(r => Math.abs(r.pct)), 1);
   legendEl.style.display = 'flex';
+  exportBtn.style.display = 'inline-block';
+  renderExpandableList(resultEl, results, '_sectorResults', 'sector');
+});
 
-  window._sectorResults = results; // usado por el handler de clic para expandir
+document.getElementById('btnExportSector').addEventListener('click', () => {
+  exportToCsv('_sectorResults', 'rotacion_sectorial');
+});
 
-  resultEl.innerHTML = results.map((r, idx) => {
-    const isUp = r.pct >= 0;
-    const widthPct = Math.min((Math.abs(r.pct)/maxAbs)*50, 50);
-    const signal = classify(r.pct, r.pricePct);
-    return `
-      <div class="sector-block" data-idx="${idx}">
-        <div class="sector-row" role="button" tabindex="0" aria-expanded="false">
-          <div class="sector-name">
-            ${r.name}<span class="ticker">${r.t}</span>
-            <span class="signal-chip ${signal.cls}">${signal.label}</span>
-          </div>
-          <div class="track">
-            <div class="zero"></div>
-            <div class="fill ${isUp?'pos':'neg'}" style="width:${widthPct}%"></div>
-          </div>
-          <div class="sector-pct ${isUp?'up':'down'}">
-            ${isUp?'+':''}${r.pct.toFixed(1)}%
-            <span class="chevron">▾</span>
-          </div>
-        </div>
-        <div class="sector-detail" id="sector-detail-${idx}"></div>
-      </div>
-    `;
-  }).join('');
+// ---- Vigilancia por lista de tickers (fichero .txt) ----
+function parseTickersFromText(text){
+  return [...new Set(
+    text.split(/[\n\r,;\t]+/)
+      .map(s => s.trim().toUpperCase())
+      .filter(Boolean)
+  )];
+}
 
-  resultEl.querySelectorAll('.sector-row').forEach(row => {
-    const toggle = () => {
-      const block = row.closest('.sector-block');
-      const idx = block.dataset.idx;
-      const detail = document.getElementById('sector-detail-' + idx);
-      const isOpen = block.classList.contains('open');
-      // cerrar cualquier otro sector abierto
-      resultEl.querySelectorAll('.sector-block.open').forEach(b => {
-        if(b !== block){
-          b.classList.remove('open');
-          b.querySelector('.sector-row').setAttribute('aria-expanded','false');
-        }
+document.getElementById('watchFileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  const fileNameEl = document.getElementById('watchFileName');
+  if(!file){ fileNameEl.style.display = 'none'; window._watchTickers = null; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const tickers = parseTickersFromText(reader.result);
+    window._watchTickers = tickers;
+    fileNameEl.style.display = 'block';
+    fileNameEl.textContent = tickers.length
+      ? `${tickers.length} tickers cargados: ${tickers.slice(0,12).join(', ')}${tickers.length>12 ? '…' : ''}`
+      : 'El archivo no contiene tickers reconocibles.';
+  };
+  reader.onerror = () => {
+    fileNameEl.style.display = 'block';
+    fileNameEl.textContent = 'No se pudo leer el archivo.';
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('btnWatch').addEventListener('click', async () => {
+  const apiKey = getApiKey();
+  const errorEl = document.getElementById('errorWatch');
+  const statusEl = document.getElementById('statusWatch');
+  const resultEl = document.getElementById('resultWatch');
+  const legendEl = document.getElementById('watchLegend');
+  const exportBtn = document.getElementById('btnExportWatch');
+  errorEl.innerHTML = '';
+  resultEl.innerHTML = '';
+  legendEl.style.display = 'none';
+  exportBtn.style.display = 'none';
+
+  if(!apiKey){ errorEl.innerHTML = '<div class="error">Introduce tu API key de Twelve Data arriba.</div>'; return; }
+  const tickers = window._watchTickers;
+  if(!tickers || !tickers.length){ errorEl.innerHTML = '<div class="error">Carga primero un archivo .txt con tickers.</div>'; return; }
+
+  const btn = document.getElementById('btnWatch');
+  btn.disabled = true;
+
+  const results = [];
+  const errors = [];
+
+  for(let i=0; i<tickers.length; i++){
+    const t = tickers[i];
+    statusEl.textContent = `Consultando ${t} (${i+1}/${tickers.length})... esto puede tardar por el límite del plan gratuito.`;
+    try{
+      const values = await fetchDailySeries(t, apiKey);
+      const {pct, lastAvg, prevAvg, baselineDays, pricePct} = computeChange(values);
+      results.push({
+        ticker:t, name:t, title:t,
+        subtitle: `cierre ${values[0].close.toFixed(2)}`,
+        pct, lastAvg, prevAvg, baselineDays, pricePct, values
       });
-      block.classList.toggle('open', !isOpen);
-      row.setAttribute('aria-expanded', String(!isOpen));
-      if(!isOpen && !detail.dataset.rendered){
-        const r = window._sectorResults[idx];
-        const threshold = parseFloat(document.getElementById('threshold').value) || 0;
-        detail.innerHTML = buildDetailHtml(r.values, r.pct, r.lastAvg, r.prevAvg, r.baselineDays, threshold, r.pricePct);
-        detail.dataset.rendered = '1';
-      }
-    };
-    row.addEventListener('click', toggle);
-    row.addEventListener('keydown', e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggle(); }});
-  });
+    }catch(err){
+      errors.push(`${t}: ${err.message}`);
+    }
+  }
+
+  statusEl.textContent = '';
+  btn.disabled = false;
+
+  if(errors.length){
+    errorEl.innerHTML = `<div class="error">Algunos tickers no se pudieron consultar:<br>${errors.join('<br>')}</div>`;
+  }
+  if(!results.length) return;
+
+  results.sort((a,b) => b.pct - a.pct);
+  legendEl.style.display = 'flex';
+  exportBtn.style.display = 'inline-block';
+  renderExpandableList(resultEl, results, '_watchResults', 'watch');
+});
+
+document.getElementById('btnExportWatch').addEventListener('click', () => {
+  exportToCsv('_watchResults', 'vigilancia_lista');
 });
 </script>
 
