@@ -670,7 +670,7 @@
   </div>
 
   <div class="footnote">
-    Métrica: variación % del volumen medio de los últimos 3 días hábiles <b>completos</b> (se excluye la sesión de hoy, ya que su volumen está incompleto mientras el mercado sigue abierto) frente a la media de los ~17 días hábiles previos, combinada con la variación de precio en la misma ventana para clasificar cada caso como impulso alcista, posible acumulación, distribución o sin señal clara. Es una lectura orientativa, no una recomendación de inversión.
+    Métrica: variación % del volumen medio de los últimos 3 días hábiles <b>completos</b> (se excluye la sesión de hoy, ya que su volumen está incompleto mientras el mercado sigue abierto) frente a la media de los ~30 días hábiles previos, combinada con la variación de precio en la misma ventana para clasificar cada caso como impulso alcista, posible acumulación, distribución o sin señal clara. Es una lectura orientativa, no una recomendación de inversión.
     Plan gratuito de Twelve Data: máx. 8 peticiones/min y 800/día — tanto la rotación sectorial como la vigilancia por lista respetan ese límite automáticamente; con listas largas puede tardar varios minutos.
     Sectores basados en los ETFs SPDR Select Sector (XLC, XLY, XLP, XLE, XLF, XLV, XLI, XLB, XLRE, XLK, XLU) como proxy de EE.UU.
     Los resultados de rotación sectorial y de vigilancia por lista se pueden exportar a CSV con la fecha de la consulta.
@@ -777,7 +777,7 @@ function todayStr(){
 }
 
 async function fetchDailySeries(symbol, apiKey){
-  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=1day&outputsize=21&apikey=${encodeURIComponent(apiKey)}`;
+  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=1day&outputsize=34&apikey=${encodeURIComponent(apiKey)}`;
   const data = await throttledFetch(url);
   if(data.status === 'error' || data.code){
     throw new Error(data.message || 'Error consultando ' + symbol);
@@ -804,10 +804,10 @@ async function fetchDailySeries(symbol, apiKey){
 
 function computeChange(values){
   // values[0] = más reciente.
-  // Referencia = media de los días 4 al 20 (hasta 17 sesiones), para que
+  // Referencia = media de los días 4 al 33 (hasta 30 sesiones), para que
   // un solo día de volumen anómalo no distorsione la comparación.
   const last3 = values.slice(0,3);
-  const baseline = values.slice(3, 20);
+  const baseline = values.slice(3, 33);
   const avg = arr => arr.reduce((a,b)=>a+b.volume,0) / arr.length;
   const lastAvg = avg(last3);
   const baseAvg = avg(baseline.length ? baseline : values.slice(3,6));
@@ -1045,7 +1045,7 @@ function buildDetailHtml(values, pct, lastAvg, prevAvg, baselineDays, threshold,
     ? `<div style="font-size:12px;color:${isUp?'var(--green)':'var(--red)'};margin-bottom:14px;">⚠ Supera el umbral de ${threshold}%</div>`
     : '';
 
-  const barCount = Math.min(values.length, 20);
+  const barCount = Math.min(values.length, 33);
   const maxVol = Math.max(...values.slice(0,barCount).map(v=>v.volume));
   const barsHtml = values.slice(0,barCount).reverse().map((v, idx, arr) => {
     const isRecent = idx >= arr.length - 3;
