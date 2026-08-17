@@ -543,7 +543,7 @@
   </div>
 
   <div class="footnote">
-    Métrica: variación % del volumen medio de los últimos 3 días hábiles frente a la media de los ~17 días hábiles previos (20 en total), combinada con la variación de precio en la misma ventana para clasificar cada caso como impulso alcista, posible acumulación, distribución o sin señal clara. Es una lectura orientativa, no una recomendación de inversión.
+    Métrica: variación % del volumen medio de los últimos 3 días hábiles <b>completos</b> (se excluye la sesión de hoy, ya que su volumen está incompleto mientras el mercado sigue abierto) frente a la media de los ~17 días hábiles previos, combinada con la variación de precio en la misma ventana para clasificar cada caso como impulso alcista, posible acumulación, distribución o sin señal clara. Es una lectura orientativa, no una recomendación de inversión.
     Plan gratuito de Twelve Data: máx. 8 peticiones/min — la rotación sectorial se consulta con esperas automáticas para no exceder el límite.
     Sectores basados en los ETFs SPDR Select Sector (XLC, XLY, XLP, XLE, XLF, XLV, XLI, XLB, XLRE, XLK, XLU) como proxy de EE.UU.
   </div>
@@ -585,8 +585,16 @@ function getApiKey(){
   return document.getElementById('apiKey').value.trim();
 }
 
+function todayStr(){
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 async function fetchDailySeries(symbol, apiKey){
-  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=1day&outputsize=20&apikey=${encodeURIComponent(apiKey)}`;
+  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=1day&outputsize=21&apikey=${encodeURIComponent(apiKey)}`;
   const data = await throttledFetch(url);
   if(data.status === 'error' || data.code){
     throw new Error(data.message || 'Error consultando ' + symbol);
@@ -594,12 +602,21 @@ async function fetchDailySeries(symbol, apiKey){
   if(!data.values || data.values.length < 6){
     throw new Error('Datos insuficientes para ' + symbol + ' (se necesitan al menos 6 sesiones).');
   }
-  // Twelve Data devuelve orden descendente (más reciente primero)
-  return data.values.map(v => ({
-    date: v.datetime,
-    volume: parseFloat(v.volume),
-    close: parseFloat(v.close)
-  }));
+  // Twelve Data devuelve orden descendente (más reciente primero).
+  // Se excluye la sesión de hoy: si el mercado está abierto, su volumen
+  // está incompleto y distorsiona la comparación con días cerrados.
+  const today = todayStr();
+  const values = data.values
+    .filter(v => v.datetime !== today)
+    .map(v => ({
+      date: v.datetime,
+      volume: parseFloat(v.volume),
+      close: parseFloat(v.close)
+    }));
+  if(values.length < 6){
+    throw new Error('Datos insuficientes para ' + symbol + ' tras excluir la sesión de hoy.');
+  }
+  return values;
 }
 
 function computeChange(values){
@@ -757,11 +774,11 @@ function buildDetailHtml(values, pct, lastAvg, prevAvg, baselineDays, threshold,
     <div class="stat-pair">
       <div class="stat-big">
         <span class="pct ${isUp?'up':'down'}">${isUp?'+':''}${pct.toFixed(1)}%</span>
-        <span class="lbl">volumen (3 días vs media de ${baselineDays} días previos)</span>
+        <span class="lbl">volumen (últimos 3 días completos vs media de ${baselineDays} previos)</span>
       </div>
       <div class="stat-big">
         <span class="pct ${isPriceUp?'up':'down'}">${isPriceUp?'+':''}${pricePct.toFixed(1)}%</span>
-        <span class="lbl">precio (últimas 3 sesiones)</span>
+        <span class="lbl">precio (últimas 3 sesiones completas)</span>
       </div>
     </div>
     ${flag}
