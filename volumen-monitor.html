@@ -117,6 +117,38 @@
   }
   input:focus{border-color:var(--amber-dim);}
 
+  .config-adv{
+    margin-bottom:20px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:2px 18px;
+    background:var(--panel);
+  }
+  .config-adv summary{
+    cursor:pointer;
+    padding:12px 0;
+    font-size:12.5px;
+    color:var(--text-dim);
+    list-style:none;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .config-adv summary::before{
+    content:'▸';
+    color:var(--amber);
+    transition:transform .15s ease;
+  }
+  .config-adv[open] summary::before{transform:rotate(90deg);}
+  .config-adv summary::-webkit-details-marker{display:none;}
+  .config-hint{
+    font-size:11.5px;
+    color:var(--text-dim);
+    line-height:1.6;
+    margin:2px 0 14px;
+  }
+  .config-hint b{color:var(--text);}
+
   .tabs{
     display:flex;
     gap:2px;
@@ -260,15 +292,21 @@
   }
 
   /* Sector rotation */
+  .sector-block{
+    border-bottom:1px solid var(--line);
+  }
+  .sector-block:last-child{border-bottom:none;}
   .sector-row{
     display:grid;
     grid-template-columns:110px 1fr 90px;
     align-items:center;
     gap:12px;
     padding:9px 0;
-    border-bottom:1px solid var(--line);
+    cursor:pointer;
+    border-radius:6px;
   }
-  .sector-row:last-child{border-bottom:none;}
+  .sector-row:hover{background:var(--panel-2);}
+  .sector-row:focus-visible{outline:2px solid var(--amber-dim); outline-offset:2px;}
   .sector-name{
     font-size:13px;
   }
@@ -307,7 +345,29 @@
     font-family:'IBM Plex Mono',monospace;
     font-size:13px;
     font-weight:600;
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:5px;
   }
+  .chevron{
+    color:var(--text-dim);
+    font-size:11px;
+    transition:transform .18s ease;
+  }
+  .sector-block.open .chevron{transform:rotate(180deg);}
+  .sector-detail{
+    display:none;
+    padding:4px 0 18px;
+    animation:fadeIn .15s ease;
+  }
+  .sector-block.open .sector-detail{display:block;}
+  @keyframes fadeIn{
+    from{opacity:0;}
+    to{opacity:1;}
+  }
+  .sector-detail .stat-big .pct{font-size:28px;}
+  .sector-detail .bars{height:110px;}
 
   .legend{
     display:flex;
@@ -318,6 +378,40 @@
   }
   .legend span{display:flex;align-items:center;gap:6px;}
   .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+
+  .stat-pair{
+    display:flex;
+    gap:28px;
+    flex-wrap:wrap;
+    margin:6px 0 4px;
+  }
+  .stat-pair .stat-big{margin:0;}
+
+  .signal-badge{
+    display:inline-block;
+    font-size:11px;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    padding:5px 10px;
+    border-radius:20px;
+    margin-bottom:12px;
+  }
+  .signal-chip{
+    display:inline-block;
+    font-size:9.5px;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.03em;
+    padding:2px 7px;
+    border-radius:10px;
+    margin-left:8px;
+    vertical-align:middle;
+  }
+  .sig-up{background:var(--green-dim); color:var(--green);}
+  .sig-down{background:var(--red-dim); color:var(--red);}
+  .sig-accum{background:#3a2e12; color:var(--amber);}
+  .sig-none{background:var(--panel-2); color:var(--text-dim);}
 
   .footnote{
     margin-top:22px;
@@ -359,6 +453,9 @@
     .track{grid-column:1 / -1;grid-row:2;height:16px;}
     .sector-pct{grid-column:2;grid-row:1;font-size:14px;}
     .sector-name{grid-column:1;grid-row:1;font-size:13.5px;}
+    .sector-name .signal-chip{display:block;margin:4px 0 0;width:fit-content;}
+    .sector-detail .stat-big .pct{font-size:24px;}
+    .stat-pair{gap:20px;}
 
     .legend{gap:12px;flex-wrap:wrap;font-size:10.5px;}
   }
@@ -391,6 +488,25 @@
     </div>
   </div>
 
+  <details class="config-adv">
+    <summary>Ajustes de clasificación (volumen / precio)</summary>
+    <div class="config" style="margin-top:10px;">
+      <div class="field" style="max-width:220px;">
+        <label>Volumen "significativo" desde (%)</label>
+        <input type="number" id="volSignalThreshold" value="10" min="0" step="1">
+      </div>
+      <div class="field" style="max-width:220px;">
+        <label>Precio "plano" hasta (±%)</label>
+        <input type="number" id="priceFlatBand" value="1.5" min="0" step="0.1">
+      </div>
+    </div>
+    <p class="config-hint">
+      Un caso se marca <b>impulso alcista</b> si el volumen sube por encima del primer umbral y el precio sube por encima del segundo.
+      Se marca <b>posible acumulación</b> si el volumen sube pero el precio se queda dentro de la banda "plana".
+      Se marca <b>distribución</b> si el volumen sube y el precio cae por debajo de la banda.
+    </p>
+  </details>
+
   <div class="tabs">
     <button class="tab-btn active" data-tab="single">Acción individual</button>
     <button class="tab-btn" data-tab="sector">Rotación sectorial</button>
@@ -418,14 +534,16 @@
     </div>
     <div id="errorSector"></div>
     <div class="legend" id="sectorLegend" style="display:none;">
-      <span><i class="dot" style="background:var(--green)"></i> Volumen subiendo (entra dinero)</span>
-      <span><i class="dot" style="background:var(--red)"></i> Volumen bajando (sale dinero)</span>
+      <span><i class="dot" style="background:var(--green)"></i> Impulso alcista</span>
+      <span><i class="dot" style="background:var(--amber)"></i> Posible acumulación</span>
+      <span><i class="dot" style="background:var(--red)"></i> Distribución</span>
+      <span><i class="dot" style="background:var(--text-dim)"></i> Sin señal clara</span>
     </div>
     <div id="resultSector"></div>
   </div>
 
   <div class="footnote">
-    Métrica: variación % del volumen medio de los últimos 3 días hábiles frente a la media de los ~17 días hábiles previos (20 en total). Usar una base más larga evita que un solo día con volumen anómalo (ej. un dato macro que mueve a todo el mercado) distorsione la lectura de rotación.
+    Métrica: variación % del volumen medio de los últimos 3 días hábiles frente a la media de los ~17 días hábiles previos (20 en total), combinada con la variación de precio en la misma ventana para clasificar cada caso como impulso alcista, posible acumulación, distribución o sin señal clara. Es una lectura orientativa, no una recomendación de inversión.
     Plan gratuito de Twelve Data: máx. 8 peticiones/min — la rotación sectorial se consulta con esperas automáticas para no exceder el límite.
     Sectores basados en los ETFs SPDR Select Sector (XLC, XLY, XLP, XLE, XLF, XLV, XLI, XLB, XLRE, XLK, XLU) como proxy de EE.UU.
   </div>
@@ -479,7 +597,8 @@ async function fetchDailySeries(symbol, apiKey){
   // Twelve Data devuelve orden descendente (más reciente primero)
   return data.values.map(v => ({
     date: v.datetime,
-    volume: parseFloat(v.volume)
+    volume: parseFloat(v.volume),
+    close: parseFloat(v.close)
   }));
 }
 
@@ -493,7 +612,41 @@ function computeChange(values){
   const lastAvg = avg(last3);
   const baseAvg = avg(baseline.length ? baseline : values.slice(3,6));
   const pct = baseAvg === 0 ? 0 : ((lastAvg - baseAvg) / baseAvg) * 100;
-  return {pct, lastAvg, prevAvg: baseAvg, baselineDays: baseline.length || 3};
+
+  // Variación de precio en la misma ventana de 3 sesiones (cierre actual vs cierre de hace 3 sesiones)
+  const refIdx = Math.min(3, values.length - 1);
+  const priceNow = values[0].close;
+  const priceRef = values[refIdx].close;
+  const pricePct = priceRef ? ((priceNow - priceRef) / priceRef) * 100 : 0;
+
+  return {pct, lastAvg, prevAvg: baseAvg, baselineDays: baseline.length || 3, pricePct};
+}
+
+// Umbrales de clasificación: volumen "significativo" al alza, y banda de
+// precio "plano" (para distinguir acumulación de un movimiento direccional claro).
+// Ajustables por el usuario en el panel de "Ajustes de clasificación".
+function getVolSignalThreshold(){
+  const v = parseFloat(document.getElementById('volSignalThreshold').value);
+  return isNaN(v) ? 10 : v;
+}
+function getPriceFlatBand(){
+  const v = parseFloat(document.getElementById('priceFlatBand').value);
+  return isNaN(v) ? 1.5 : Math.abs(v);
+}
+
+function classify(pctVol, pricePct){
+  const volSignalThreshold = getVolSignalThreshold();
+  const priceFlatBand = getPriceFlatBand();
+  if(pctVol <= volSignalThreshold){
+    return {label:'Sin señal clara', cls:'sig-none'};
+  }
+  if(pricePct > priceFlatBand){
+    return {label:'Impulso alcista', cls:'sig-up'};
+  }
+  if(pricePct < -priceFlatBand){
+    return {label:'Distribución', cls:'sig-down'};
+  }
+  return {label:'Posible acumulación', cls:'sig-accum'};
 }
 
 function fmtVol(n){
@@ -502,6 +655,38 @@ function fmtVol(n){
   if(n >= 1e3) return (n/1e3).toFixed(1)+'K';
   return n.toFixed(0);
 }
+
+// ---- Re-cálculo en vivo al cambiar umbrales, sin volver a llamar a la API ----
+function refreshClassificationUI(){
+  const threshold = parseFloat(document.getElementById('threshold').value) || 0;
+
+  const sectorResultEl = document.getElementById('resultSector');
+  if(window._sectorResults){
+    window._sectorResults.forEach((r, idx) => {
+      const block = sectorResultEl.querySelector(`.sector-block[data-idx="${idx}"]`);
+      if(!block) return;
+      const chip = block.querySelector('.signal-chip');
+      if(chip){
+        const signal = classify(r.pct, r.pricePct);
+        chip.className = 'signal-chip ' + signal.cls;
+        chip.textContent = signal.label;
+      }
+      const detail = document.getElementById('sector-detail-' + idx);
+      if(detail && detail.dataset.rendered){
+        detail.innerHTML = buildDetailHtml(r.values, r.pct, r.lastAvg, r.prevAvg, r.baselineDays, threshold, r.pricePct);
+      }
+    });
+  }
+
+  const singleResultEl = document.getElementById('resultSingle');
+  if(window._lastSingle && singleResultEl.querySelector('.signal-badge')){
+    const s = window._lastSingle;
+    singleResultEl.innerHTML = buildDetailHtml(s.values, s.pct, s.lastAvg, s.prevAvg, s.baselineDays, threshold, s.pricePct);
+  }
+}
+['volSignalThreshold','priceFlatBand','threshold'].forEach(id => {
+  document.getElementById(id).addEventListener('input', refreshClassificationUI);
+});
 
 // ---- Tabs ----
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -532,39 +717,11 @@ document.getElementById('btnSingle').addEventListener('click', async () => {
 
   try{
     const values = await fetchDailySeries(ticker, apiKey);
-    const {pct, lastAvg, prevAvg, baselineDays} = computeChange(values);
+    const {pct, lastAvg, prevAvg, baselineDays, pricePct} = computeChange(values);
     statusEl.textContent = '';
-
-    const isUp = pct >= 0;
+    window._lastSingle = {values, pct, lastAvg, prevAvg, baselineDays, pricePct};
     const threshold = parseFloat(document.getElementById('threshold').value) || 0;
-    const flag = Math.abs(pct) >= threshold
-      ? `<div style="font-size:12px;color:${isUp?'var(--green)':'var(--red)'};margin-bottom:14px;">⚠ Supera el umbral de ${threshold}%</div>`
-      : '';
-
-    const barCount = Math.min(values.length, 20);
-    const maxVol = Math.max(...values.slice(0,barCount).map(v=>v.volume));
-    const barsHtml = values.slice(0,barCount).reverse().map((v, idx, arr) => {
-      const isRecent = idx >= arr.length - 3;
-      const h = maxVol ? Math.max((v.volume/maxVol)*100, 3) : 3;
-      const d = new Date(v.date);
-      const dLabel = `${d.getDate()}/${d.getMonth()+1}`;
-      return `<div class="bar-col">
-        <div class="bar-val">${fmtVol(v.volume)}</div>
-        <div class="bar ${isRecent?'recent':''}" style="height:${h}%"></div>
-        <div class="bar-date">${dLabel}</div>
-      </div>`;
-    }).join('');
-
-    resultEl.innerHTML = `
-      <div class="stat-big">
-        <span class="pct ${isUp?'up':'down'}">${isUp?'+':''}${pct.toFixed(1)}%</span>
-        <span class="lbl">variación de volumen (últimos 3 días vs media de los ${baselineDays} días previos)</span>
-      </div>
-      ${flag}
-      <div class="subtext">media reciente: ${fmtVol(lastAvg)} · media base: ${fmtVol(prevAvg)}</div>
-      <div class="bars-scroll"><div class="bars">${barsHtml}</div></div>
-      <div class="footnote" style="margin-top:14px;">Últimas ${barCount} sesiones (desliza para ver todas) · las barras ámbar son los 3 días usados para la media reciente. Revisa si hay un día suelto con volumen muy alto: eso explicaría una caída sin que sea rotación real.</div>
-    `;
+    resultEl.innerHTML = buildDetailHtml(values, pct, lastAvg, prevAvg, baselineDays, threshold, pricePct);
   }catch(err){
     statusEl.textContent = '';
     errorEl.innerHTML = `<div class="error">${err.message}</div>`;
@@ -572,6 +729,48 @@ document.getElementById('btnSingle').addEventListener('click', async () => {
     btn.disabled = false;
   }
 });
+
+function buildDetailHtml(values, pct, lastAvg, prevAvg, baselineDays, threshold, pricePct){
+  const isUp = pct >= 0;
+  const isPriceUp = pricePct >= 0;
+  const signal = classify(pct, pricePct);
+  const flag = Math.abs(pct) >= threshold
+    ? `<div style="font-size:12px;color:${isUp?'var(--green)':'var(--red)'};margin-bottom:14px;">⚠ Supera el umbral de ${threshold}%</div>`
+    : '';
+
+  const barCount = Math.min(values.length, 20);
+  const maxVol = Math.max(...values.slice(0,barCount).map(v=>v.volume));
+  const barsHtml = values.slice(0,barCount).reverse().map((v, idx, arr) => {
+    const isRecent = idx >= arr.length - 3;
+    const h = maxVol ? Math.max((v.volume/maxVol)*100, 3) : 3;
+    const d = new Date(v.date);
+    const dLabel = `${d.getDate()}/${d.getMonth()+1}`;
+    return `<div class="bar-col">
+      <div class="bar-val">${fmtVol(v.volume)}</div>
+      <div class="bar ${isRecent?'recent':''}" style="height:${h}%"></div>
+      <div class="bar-date">${dLabel}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="signal-badge ${signal.cls}">${signal.label}</div>
+    <div class="stat-pair">
+      <div class="stat-big">
+        <span class="pct ${isUp?'up':'down'}">${isUp?'+':''}${pct.toFixed(1)}%</span>
+        <span class="lbl">volumen (3 días vs media de ${baselineDays} días previos)</span>
+      </div>
+      <div class="stat-big">
+        <span class="pct ${isPriceUp?'up':'down'}">${isPriceUp?'+':''}${pricePct.toFixed(1)}%</span>
+        <span class="lbl">precio (últimas 3 sesiones)</span>
+      </div>
+    </div>
+    ${flag}
+    <div class="subtext">media reciente: ${fmtVol(lastAvg)} · media base: ${fmtVol(prevAvg)}</div>
+    <div class="bars-scroll"><div class="bars">${barsHtml}</div></div>
+    <div class="footnote" style="margin-top:14px;">Últimas ${barCount} sesiones (desliza para ver todas) · las barras ámbar son los 3 días usados para la media reciente. Revisa si hay un día suelto con volumen muy alto: eso explicaría una caída sin que sea rotación real.</div>
+    <div class="footnote" style="margin-top:8px;">Clasificación orientativa: volumen subiendo &gt;${getVolSignalThreshold()}% + precio subiendo &gt;${getPriceFlatBand()}% → impulso alcista · volumen subiendo + precio plano → posible acumulación · volumen subiendo + precio bajando &gt;${getPriceFlatBand()}% → distribución. No es una recomendación de inversión.</div>
+  `;
+}
 
 document.getElementById('tickerInput').addEventListener('keydown', e => {
   if(e.key === 'Enter') document.getElementById('btnSingle').click();
@@ -601,8 +800,8 @@ document.getElementById('btnSector').addEventListener('click', async () => {
     statusEl.textContent = `Consultando ${s.t} (${i+1}/${SECTORS.length})... esto puede tardar por el límite del plan gratuito.`;
     try{
       const values = await fetchDailySeries(s.t, apiKey);
-      const {pct} = computeChange(values);
-      results.push({...s, pct});
+      const {pct, lastAvg, prevAvg, baselineDays, pricePct} = computeChange(values);
+      results.push({...s, pct, lastAvg, prevAvg, baselineDays, pricePct, values});
     }catch(err){
       errors.push(`${s.t}: ${err.message}`);
     }
@@ -620,20 +819,58 @@ document.getElementById('btnSector').addEventListener('click', async () => {
   const maxAbs = Math.max(...results.map(r => Math.abs(r.pct)), 1);
   legendEl.style.display = 'flex';
 
-  resultEl.innerHTML = results.map(r => {
+  window._sectorResults = results; // usado por el handler de clic para expandir
+
+  resultEl.innerHTML = results.map((r, idx) => {
     const isUp = r.pct >= 0;
     const widthPct = Math.min((Math.abs(r.pct)/maxAbs)*50, 50);
+    const signal = classify(r.pct, r.pricePct);
     return `
-      <div class="sector-row">
-        <div class="sector-name">${r.name}<span class="ticker">${r.t}</span></div>
-        <div class="track">
-          <div class="zero"></div>
-          <div class="fill ${isUp?'pos':'neg'}" style="width:${widthPct}%"></div>
+      <div class="sector-block" data-idx="${idx}">
+        <div class="sector-row" role="button" tabindex="0" aria-expanded="false">
+          <div class="sector-name">
+            ${r.name}<span class="ticker">${r.t}</span>
+            <span class="signal-chip ${signal.cls}">${signal.label}</span>
+          </div>
+          <div class="track">
+            <div class="zero"></div>
+            <div class="fill ${isUp?'pos':'neg'}" style="width:${widthPct}%"></div>
+          </div>
+          <div class="sector-pct ${isUp?'up':'down'}">
+            ${isUp?'+':''}${r.pct.toFixed(1)}%
+            <span class="chevron">▾</span>
+          </div>
         </div>
-        <div class="sector-pct ${isUp?'up':'down'}">${isUp?'+':''}${r.pct.toFixed(1)}%</div>
+        <div class="sector-detail" id="sector-detail-${idx}"></div>
       </div>
     `;
   }).join('');
+
+  resultEl.querySelectorAll('.sector-row').forEach(row => {
+    const toggle = () => {
+      const block = row.closest('.sector-block');
+      const idx = block.dataset.idx;
+      const detail = document.getElementById('sector-detail-' + idx);
+      const isOpen = block.classList.contains('open');
+      // cerrar cualquier otro sector abierto
+      resultEl.querySelectorAll('.sector-block.open').forEach(b => {
+        if(b !== block){
+          b.classList.remove('open');
+          b.querySelector('.sector-row').setAttribute('aria-expanded','false');
+        }
+      });
+      block.classList.toggle('open', !isOpen);
+      row.setAttribute('aria-expanded', String(!isOpen));
+      if(!isOpen && !detail.dataset.rendered){
+        const r = window._sectorResults[idx];
+        const threshold = parseFloat(document.getElementById('threshold').value) || 0;
+        detail.innerHTML = buildDetailHtml(r.values, r.pct, r.lastAvg, r.prevAvg, r.baselineDays, threshold, r.pricePct);
+        detail.dataset.rendered = '1';
+      }
+    };
+    row.addEventListener('click', toggle);
+    row.addEventListener('keydown', e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggle(); }});
+  });
 });
 </script>
 
