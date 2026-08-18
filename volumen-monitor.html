@@ -308,6 +308,16 @@
     padding-top:10px;
     -webkit-overflow-scrolling:touch;
   }
+  .price-chart-label{
+    font-size:10.5px;
+    color:var(--text-dim);
+    margin-bottom:4px;
+    white-space:nowrap;
+  }
+  .price-chart-svg{
+    display:block;
+    margin-bottom:6px;
+  }
   .bars{
     display:flex;
     align-items:flex-end;
@@ -1059,6 +1069,32 @@ function buildDetailHtml(values, pct, lastAvg, prevAvg, baselineDays, threshold,
     </div>`;
   }).join('');
 
+  // Línea de precio de cierre, alineada día a día con las mismas columnas que las barras de volumen
+  const COL_WIDTH = 32, COL_GAP = 6, CHART_H = 56, PAD = 6;
+  const closesOrdered = values.slice(0,barCount).reverse().map(v => v.close);
+  const minClose = Math.min(...closesOrdered);
+  const maxClose = Math.max(...closesOrdered);
+  const closeRange = (maxClose - minClose) || 1;
+  const xFor = i => i*(COL_WIDTH+COL_GAP) + COL_WIDTH/2;
+  const yFor = c => CHART_H - PAD - ((c-minClose)/closeRange)*(CHART_H - PAD*2);
+  const totalWidth = barCount*COL_WIDTH + (barCount-1)*COL_GAP;
+
+  let segmentsSvg = '';
+  for(let i=0; i<closesOrdered.length-1; i++){
+    const up = closesOrdered[i+1] >= closesOrdered[i];
+    segmentsSvg += `<line x1="${xFor(i).toFixed(1)}" y1="${yFor(closesOrdered[i]).toFixed(1)}" x2="${xFor(i+1).toFixed(1)}" y2="${yFor(closesOrdered[i+1]).toFixed(1)}" stroke="${up?'#4FBF7F':'#E5595F'}" stroke-width="2" stroke-linecap="round"/>`;
+  }
+  const dotsSvg = closesOrdered.map((c, i) => {
+    const isRecent = i >= closesOrdered.length - 3;
+    return `<circle cx="${xFor(i).toFixed(1)}" cy="${yFor(c).toFixed(1)}" r="${isRecent?3:2}" fill="${isRecent?'#E8A33D':'#8A9099'}"/>`;
+  }).join('');
+  const priceChartHtml = `
+    <div class="price-chart-label">Precio de cierre por día · <span style="color:var(--green)">verde</span> = sube vs. el día anterior, <span style="color:var(--red)">rojo</span> = baja</div>
+    <svg class="price-chart-svg" width="${totalWidth}" height="${CHART_H}" viewBox="0 0 ${totalWidth} ${CHART_H}">
+      ${segmentsSvg}${dotsSvg}
+    </svg>
+  `;
+
   let sectorHtml = '';
   if(sectorInfo){
     const sSignal = classify(sectorInfo.pct, sectorInfo.pricePct);
@@ -1113,7 +1149,7 @@ function buildDetailHtml(values, pct, lastAvg, prevAvg, baselineDays, threshold,
     ${flag}
     ${sectorHtml}
     <div class="subtext">media reciente: ${fmtVol(lastAvg)} · media base: ${fmtVol(prevAvg)}</div>
-    <div class="bars-scroll"><div class="bars">${barsHtml}</div></div>
+    <div class="bars-scroll">${priceChartHtml}<div class="bars">${barsHtml}</div></div>
     <div class="footnote" style="margin-top:14px;">Últimas ${barCount} sesiones (desliza para ver todas) · las barras ámbar son los 3 días usados para la media reciente. Revisa si hay un día suelto con volumen muy alto: eso explicaría una caída sin que sea rotación real.</div>
     <div class="footnote" style="margin-top:8px;">Clasificación orientativa: volumen subiendo &gt;${getVolSignalThreshold()}% + precio subiendo &gt;${getPriceFlatBand()}% → impulso alcista · volumen subiendo + precio plano → posible acumulación · volumen subiendo + precio bajando &gt;${getPriceFlatBand()}% → distribución. No es una recomendación de inversión.</div>
   `;
